@@ -1,0 +1,25 @@
+{
+  "name": "k-wordle",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "dev:web": "vite",
+    "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "npm-run-all --parallel dev:web dev:electron",
+    "build": "vite build && electron-builder",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.0.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0",
+    "npm-run-all": "^4.1.5",
+    "vite": "^5.0.0",
+    "wait-on": "^7.0.0"
+  }
+}
