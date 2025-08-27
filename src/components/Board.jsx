@@ -4,7 +4,7 @@ function Cell({ c, cls }) {
   return <div className={cls}>{c || ''}</div>;
 }
 
-function evaluate(guess, answer) {
+export function evaluate(guess, answer) {
   // Wordle-style evaluation for repeated characters
   const len = Math.max(guess.length, answer.length);
   const res = Array.from({ length: len }, () => 'absent');
@@ -32,7 +32,7 @@ function evaluate(guess, answer) {
   return res;
 }
 
-export default function Board({ guesses, current, answer = '' }) {
+export default function Board({ guesses, current, answer = '', shakeRowIndex = -1, winRowIndex = -1 }) {
   const rows = Array.from({ length: 6 }, (_, r) => guesses[r] || (r === guesses.length ? current : ''));
 
   return (
@@ -41,15 +41,17 @@ export default function Board({ guesses, current, answer = '' }) {
         const isSubmitted = r < guesses.length;
         const evals = isSubmitted ? evaluate(g, answer) : [];
         return (
-          <div className="row" key={r}>
+          <div className={`row ${shakeRowIndex === r ? 'shake' : ''} ${winRowIndex === r ? 'win' : ''}`} key={r}>
             {Array.from({ length: 6 }, (_, i) => {
               const clsBase = 'cell';
               let cls = clsBase;
               if (isSubmitted && g) {
                 const state = evals[i] || 'absent';
-                cls = `${clsBase} ${state}`;
+                const winCls = winRowIndex === r ? ' win-bounce' : '';
+                cls = `${clsBase} ${state} reveal${winCls}`;
               }
-              return <Cell key={i} c={g[i]} cls={cls} />;
+              const style = winRowIndex === r ? { animationDelay: `${i * 80 + 620}ms` } : undefined;
+              return <div key={i} style={style}><Cell c={g[i]} cls={cls} /></div>;
             })}
           </div>
         );

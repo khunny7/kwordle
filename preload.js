@@ -1,4 +1,2 @@
-// Minimal preload script for Electron security
-window.addEventListener('DOMContentLoaded', () => {
-  // You can expose APIs here if needed
-});
+// Deprecated: Electron preload. Not used in web-only build.
+// This file intentionally left blank.

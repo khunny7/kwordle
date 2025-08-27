@@ -9,4 +9,4 @@
 - [ ] Launch the Project
 - [ ] Ensure Documentation is Complete
 
-Progress: Project initialization started. React + Vite + Electron minimal setup in progress.
+Progress: Project initialization started. React + Vite web-only setup in progress; Electron removed.
