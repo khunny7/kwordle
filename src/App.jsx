@@ -6,13 +6,10 @@ import HistoryView from './components/HistoryView';
 import { WORDS } from './wordlist';
 import { appendHistory } from './storage';
 
-// Ensure we only use 6-jamo answers
-const VALID_WORDS = WORDS.filter((w) => [...w].length === 6);
-const ANSWER = VALID_WORDS.length
-  ? VALID_WORDS[Math.floor(Math.random() * VALID_WORDS.length)]
-  : 'ㄱㅏㄴㅏㄷㅏ';
+function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 export default function App() {
+  const isDev = import.meta.env.DEV;
   const [guesses, setGuesses] = useState([]);
   const [current, setCurrent] = useState('');
   const [status, setStatus] = useState('');
@@ -21,23 +18,54 @@ export default function App() {
   const [gameOver, setGameOver] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [allowed, setAllowed] = useState(null);
+  const [wordLen, setWordLen] = useState(() => {
+    const saved = Number(localStorage.getItem('kwordle.wordLen'));
+    return saved === 7 || saved === 8 ? saved : 6;
+  });
+  const [answer, setAnswer] = useState('');
   const confettiRef = useRef(null);
   const composing = useRef(false);
   // jamo-based input (no composition)
 
   useEffect(() => {
-    // expose for debugging
-    window.__WORDLE_ANSWER__ = ANSWER;
-    console.log('Answer:', ANSWER);
-    // lazy-load allowed list
-    fetch('/allowed.json').then(r => r.json()).then((list) => {
+  localStorage.setItem('kwordle.wordLen', String(wordLen));
+    // set answer and allowed whenever mode changes
+    const filtered = WORDS.filter(w => [...w].length === wordLen);
+    const url = wordLen === 6 ? '/allowed.json' : `/allowed-${wordLen}.json`;
+    fetch(url).then(r => r.json()).then((list) => {
       if (Array.isArray(list)) {
-        const union = new Set([...list, ...VALID_WORDS]);
+        const union = new Set([...list, ...filtered]);
         setAllowed(union);
+        const candidates = list && list.length ? list : filtered;
+        const nextAnswer = candidates.length ? pickRandom(candidates) : 'ㅏ'.repeat(wordLen);
+        setAnswer(nextAnswer);
+          if (isDev) {
+            window.__WORDLE_ANSWER__ = nextAnswer;
+            console.log('Answer:', nextAnswer, 'len:', wordLen);
+          } else {
+            if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
+          }
+      } else {
+        setAllowed(new Set(filtered));
+        const nextAnswer = filtered.length ? pickRandom(filtered) : 'ㅏ'.repeat(wordLen);
+        setAnswer(nextAnswer);
+          if (isDev) {
+            window.__WORDLE_ANSWER__ = nextAnswer;
+            console.log('Answer:', nextAnswer, 'len:', wordLen);
+          } else {
+            if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
+          }
       }
     }).catch(() => {
-      // fallback to built-in WORDS if fetch fails
-      setAllowed(new Set(VALID_WORDS));
+      setAllowed(new Set(filtered));
+      const nextAnswer = filtered.length ? pickRandom(filtered) : 'ㅏ'.repeat(wordLen);
+      setAnswer(nextAnswer);
+        if (isDev) {
+          window.__WORDLE_ANSWER__ = nextAnswer;
+          console.log('Answer:', nextAnswer, 'len:', wordLen);
+        } else {
+          if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
+        }
     });
 
     function onKeyDown(e) {
@@ -51,8 +79,9 @@ export default function App() {
       } else if (e.key.length === 1) {
         // append raw jamo character (assume user types jamo or pastes)
         setCurrent((s) => {
-          if (s.length >= 6) return s;
-          return (s + e.key).slice(0, 6);
+          if ([...s].length >= wordLen) return s;
+          const next = (s + e.key);
+          return [...next].slice(0, wordLen).join('');
         });
       }
     }
@@ -62,10 +91,10 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [status]);
+  }, [status, wordLen]);
 
   function submitGuess() {
-    if ([...current].length !== 6) {
+    if ([...current].length !== wordLen) {
       setShakeRow(guesses.length);
       setTimeout(() => setShakeRow(-1), 520);
       return;
@@ -80,14 +109,14 @@ export default function App() {
     const next = [...guesses, current];
     setGuesses(next);
     setCurrent('');
-    if (current === ANSWER) {
+  if (current === answer) {
       setStatus('정답!');
       setWinRow(next.length - 1);
       setGameOver(true);
       triggerConfetti();
       appendHistory({
         ts: Date.now(),
-        answer: ANSWER,
+    answer,
         success: true,
         guesses: next.length,
       });
@@ -97,7 +126,7 @@ export default function App() {
       setGameOver(true);
       appendHistory({
         ts: Date.now(),
-        answer: ANSWER,
+        answer,
         success: false,
         guesses: next.length,
       });
@@ -117,8 +146,9 @@ export default function App() {
     }
     // append raw jamo char
     setCurrent((s) => {
-      if (s.length >= 6) return s;
-      return (s + key).slice(0, 6);
+      if ([...s].length >= wordLen) return s;
+      const next = (s + key);
+      return [...next].slice(0, wordLen).join('');
     });
   }
 
@@ -176,10 +206,12 @@ export default function App() {
     setStatus('');
     setShakeRow(-1);
     setWinRow(-1);
-    setGameOver(false);
-    // Force a refresh of the answer by reloading the page to re-run module init
-    // Alternatively, we could refactor ANSWER to be stateful.
-    window.location.reload();
+  setGameOver(false);
+  // Pick a new answer for the current mode
+  const filtered = WORDS.filter(w => [...w].length === wordLen);
+  const candidates = allowed && allowed.size ? Array.from(allowed) : filtered;
+  const nextAnswer = candidates.length ? pickRandom(candidates) : 'ㅏ'.repeat(wordLen);
+  setAnswer(nextAnswer);
   }
 
   return (
@@ -187,20 +219,31 @@ export default function App() {
       <div className="app-header">
         <div className="brand"><div className="logo" /> K-Wordle</div>
         <div className="header-actions">
-          <span className="chip">Jamo mode</span>
+          <div className="segmented" role="group" aria-label="Word length selector">
+            {[6,7,8].map((L)=> (
+              <button
+                key={L}
+                type="button"
+                className={`segmented-item ${wordLen===L ? 'active' : ''}`}
+                aria-pressed={wordLen===L}
+                onClick={() => { setGuesses([]); setCurrent(''); setStatus(''); setShakeRow(-1); setWinRow(-1); setGameOver(false); setWordLen(L); }}
+                title={`${L}자`}
+              >{L}</button>
+            ))}
+          </div>
           <button className="key" onClick={() => setShowHistory(true)}>History</button>
         </div>
       </div>
       <div className="panel">
-        <Board guesses={guesses} current={current} answer={ANSWER} shakeRowIndex={shakeRow} winRowIndex={winRow} />
+        <Board guesses={guesses} current={current} answer={answer} shakeRowIndex={shakeRow} winRowIndex={winRow} wordLen={wordLen} />
       </div>
-      <Keyboard onKey={onKey} guesses={guesses} answer={ANSWER} />
+      <Keyboard onKey={onKey} guesses={guesses} answer={answer} />
       {status ? <div className="status">{status}</div> : null}
       {gameOver && (
         <div className="overlay">
           <div className="overlay-card history-card">
             <div className="overlay-title">{status || '게임 종료'}</div>
-            <div className="overlay-sub">정답: {decomposeToJamo(ANSWER)}</div>
+            <div className="overlay-sub">정답: {decomposeToJamo(answer)}</div>
             <div className="overlay-actions" style={{ marginBottom: 12 }}>
               <button className="key action" onClick={nextGame}>Next Game</button>
             </div>
@@ -210,7 +253,9 @@ export default function App() {
       )}
   {showHistory && <HistoryModal onClose={() => setShowHistory(false)} />}
       <canvas ref={confettiRef} className="confetti" />
-      <div className="debug">DEBUG ANSWER: {ANSWER} — JAMO: {decomposeToJamo(ANSWER)}</div>
+        {isDev && (
+          <div className="debug">DEBUG ANSWER: {answer} — JAMO: {decomposeToJamo(answer)} (len {wordLen})</div>
+        )}
     </div>
   );
 }

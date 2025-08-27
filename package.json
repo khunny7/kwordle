@@ -7,6 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
   "generate:wordlist": "node scripts/generate-wordlist.js",
+  "import:ko-dic": "node scripts/import-ko-dic.js",
   "deploy": "npm run build && firebase deploy"
   },
   "dependencies": {

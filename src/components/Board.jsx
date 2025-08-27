@@ -32,17 +32,17 @@ export function evaluate(guess, answer) {
   return res;
 }
 
-export default function Board({ guesses, current, answer = '', shakeRowIndex = -1, winRowIndex = -1 }) {
+export default function Board({ guesses, current, answer = '', shakeRowIndex = -1, winRowIndex = -1, wordLen = 6 }) {
   const rows = Array.from({ length: 6 }, (_, r) => guesses[r] || (r === guesses.length ? current : ''));
 
   return (
-    <div className="board">
+  <div className={`board board-len-${wordLen}`}>
       {rows.map((g, r) => {
         const isSubmitted = r < guesses.length;
         const evals = isSubmitted ? evaluate(g, answer) : [];
         return (
           <div className={`row ${shakeRowIndex === r ? 'shake' : ''} ${winRowIndex === r ? 'win' : ''}`} key={r}>
-            {Array.from({ length: 6 }, (_, i) => {
+            {Array.from({ length: wordLen }, (_, i) => {
               const clsBase = 'cell';
               let cls = clsBase;
               if (isSubmitted && g) {

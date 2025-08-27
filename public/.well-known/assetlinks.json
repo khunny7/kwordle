@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.piano8283.yunsol.twa",
+        "sha256_cert_fingerprints": ["E7:45:88:E1:51:8B:FE:E0:EA:46:10:8B:F6:E8:F6:4A:13:2A:40:D9:5F:DC:D5:E3:2B:E0:E3:FD:47:34:7C:CB"]
+      }
+    }]
