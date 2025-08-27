@@ -28,46 +28,9 @@ export default function App() {
   // jamo-based input (no composition)
 
   useEffect(() => {
-  localStorage.setItem('kwordle.wordLen', String(wordLen));
-    // set answer and allowed whenever mode changes
-    const filtered = WORDS.filter(w => [...w].length === wordLen);
-    const url = wordLen === 6 ? '/allowed.json' : `/allowed-${wordLen}.json`;
-    fetch(url).then(r => r.json()).then((list) => {
-      if (Array.isArray(list)) {
-        const union = new Set([...list, ...filtered]);
-        setAllowed(union);
-        const candidates = list && list.length ? list : filtered;
-        const nextAnswer = candidates.length ? pickRandom(candidates) : 'ㅏ'.repeat(wordLen);
-        setAnswer(nextAnswer);
-          if (isDev) {
-            window.__WORDLE_ANSWER__ = nextAnswer;
-            console.log('Answer:', nextAnswer, 'len:', wordLen);
-          } else {
-            if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
-          }
-      } else {
-        setAllowed(new Set(filtered));
-        const nextAnswer = filtered.length ? pickRandom(filtered) : 'ㅏ'.repeat(wordLen);
-        setAnswer(nextAnswer);
-          if (isDev) {
-            window.__WORDLE_ANSWER__ = nextAnswer;
-            console.log('Answer:', nextAnswer, 'len:', wordLen);
-          } else {
-            if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
-          }
-      }
-    }).catch(() => {
-      setAllowed(new Set(filtered));
-      const nextAnswer = filtered.length ? pickRandom(filtered) : 'ㅏ'.repeat(wordLen);
-      setAnswer(nextAnswer);
-        if (isDev) {
-          window.__WORDLE_ANSWER__ = nextAnswer;
-          console.log('Answer:', nextAnswer, 'len:', wordLen);
-        } else {
-          if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
-        }
-    });
+    localStorage.setItem('kwordle.wordLen', String(wordLen));
 
+    // Keyboard input handler (raw jamo, limited by wordLen)
     function onKeyDown(e) {
       if (status) return;
       if (e.key === 'Enter') {
@@ -76,8 +39,7 @@ export default function App() {
       } else if (e.key === 'Backspace') {
         e.preventDefault();
         setCurrent((s) => s.slice(0, -1));
-      } else if (e.key.length === 1) {
-        // append raw jamo character (assume user types jamo or pastes)
+      } else if (e.key && e.key.length === 1) {
         setCurrent((s) => {
           if ([...s].length >= wordLen) return s;
           const next = (s + e.key);
@@ -86,8 +48,36 @@ export default function App() {
       }
     }
 
-    window.addEventListener('keydown', onKeyDown);
+    // Load allowed list with fallback and no-store cache
+    const filtered = WORDS.filter(w => [...w].length === wordLen);
+    async function loadAllowed() {
+      const urls = [`/allowed-${wordLen}.json`, '/allowed.json'];
+      let list = null;
+      for (const u of urls) {
+        try {
+          const res = await fetch(u, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          if (Array.isArray(data) && data.length) { list = data; break; }
+        } catch (e) {
+          if (isDev) console.warn('Allowed list load failed for', u, e);
+        }
+      }
+      const union = list ? new Set([...list, ...filtered]) : new Set(filtered);
+      setAllowed(union);
+      const candidates = list && list.length ? list : filtered;
+      const nextAnswer = candidates.length ? pickRandom(candidates) : '\u314f'.repeat(wordLen);
+      setAnswer(nextAnswer);
+      if (isDev) {
+        window.__WORDLE_ANSWER__ = nextAnswer;
+        console.log('Answer:', nextAnswer, 'len:', wordLen);
+      } else {
+        if ('__WORDLE_ANSWER__' in window) delete window.__WORDLE_ANSWER__;
+      }
+    }
+    loadAllowed();
 
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
