@@ -223,6 +223,7 @@ export default function App() {
               >{L}</button>
             ))}
           </div>
+          <a className="chip" href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
           <button className="key" onClick={() => setShowHistory(true)}>History</button>
         </div>
       </div>
