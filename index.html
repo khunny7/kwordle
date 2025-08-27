@@ -2,11 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f1226" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>K-Wordle</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+      <style>
+        .sw-toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#111827e0;color:#e5e7eb;border:1px solid #ffffff12;border-radius:10px;padding:10px 14px;z-index:9999}
+        .sw-toast button{margin-left:10px;background:linear-gradient(135deg,#7c5cff,#22d3ee);border:none;color:#0b1020;font-weight:800;border-radius:8px;padding:6px 10px;cursor:pointer}
+      </style>
+      <script>
+        // Optional: prompt to reload when a new SW is available
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.getRegistration().then((reg) => {
+              if (!reg) return;
+              reg.addEventListener('updatefound', () => {
+                const newSW = reg.installing;
+                if (!newSW) return;
+                newSW.addEventListener('statechange', () => {
+                  if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                    const el = document.createElement('div');
+                    el.className = 'sw-toast';
+                    el.innerHTML = 'New version ready <button>Reload</button>';
+                    el.querySelector('button').onclick = () => window.location.reload();
+                    document.body.appendChild(el);
+                  }
+                });
+              });
+            });
+          });
+        }
+      </script>
   </body>
 </html>
