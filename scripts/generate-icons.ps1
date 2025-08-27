@@ -78,4 +78,6 @@ function New-IconPng {
 
 New-IconPng -Size 192 -OutPath (Join-Path $PSScriptRoot '..\public\icons\icon-192.png')
 New-IconPng -Size 512 -OutPath (Join-Path $PSScriptRoot '..\public\icons\icon-512.png')
+New-IconPng -Size 32  -OutPath (Join-Path $PSScriptRoot '..\public\icons\icon-32.png')
+New-IconPng -Size 180 -OutPath (Join-Path $PSScriptRoot '..\public\icons\icon-180.png')
 Write-Host 'Icons generated.'

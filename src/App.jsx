@@ -23,32 +23,14 @@ export default function App() {
     return saved === 7 || saved === 8 ? saved : 6;
   });
   const [answer, setAnswer] = useState('');
+  const [revealedAnswer, setRevealedAnswer] = useState(null);
   const confettiRef = useRef(null);
   const composing = useRef(false);
   // jamo-based input (no composition)
 
+  // Effect 1: Load allowed list and pick answer ONLY when word length changes
   useEffect(() => {
     localStorage.setItem('kwordle.wordLen', String(wordLen));
-
-    // Keyboard input handler (raw jamo, limited by wordLen)
-    function onKeyDown(e) {
-      if (status) return;
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitGuess();
-      } else if (e.key === 'Backspace') {
-        e.preventDefault();
-        setCurrent((s) => s.slice(0, -1));
-      } else if (e.key && e.key.length === 1) {
-        setCurrent((s) => {
-          if ([...s].length >= wordLen) return s;
-          const next = (s + e.key);
-          return [...next].slice(0, wordLen).join('');
-        });
-      }
-    }
-
-    // Load allowed list with fallback and no-store cache
     const filtered = WORDS.filter(w => [...w].length === wordLen);
     async function loadAllowed() {
       const urls = [`/allowed-${wordLen}.json`, '/allowed.json'];
@@ -76,11 +58,28 @@ export default function App() {
       }
     }
     loadAllowed();
+  }, [wordLen]);
 
+  // Effect 2: Keyboard handler, re-bind when status or wordLen changes
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (status) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitGuess();
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setCurrent((s) => s.slice(0, -1));
+      } else if (e.key && e.key.length === 1) {
+        setCurrent((s) => {
+          if ([...s].length >= wordLen) return s;
+          const next = (s + e.key);
+          return [...next].slice(0, wordLen).join('');
+        });
+      }
+    }
     window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [status, wordLen]);
 
   function submitGuess() {
@@ -103,6 +102,7 @@ export default function App() {
       setStatus('정답!');
       setWinRow(next.length - 1);
       setGameOver(true);
+      setRevealedAnswer(answer);
       triggerConfetti();
       appendHistory({
         ts: Date.now(),
@@ -114,6 +114,7 @@ export default function App() {
     } else if (next.length >= 6) {
       setStatus('실패!');
       setGameOver(true);
+      setRevealedAnswer(answer);
       appendHistory({
         ts: Date.now(),
         answer,
@@ -197,6 +198,7 @@ export default function App() {
     setShakeRow(-1);
     setWinRow(-1);
   setGameOver(false);
+  setRevealedAnswer(null);
   // Pick a new answer for the current mode
   const filtered = WORDS.filter(w => [...w].length === wordLen);
   const candidates = allowed && allowed.size ? Array.from(allowed) : filtered;
@@ -233,7 +235,7 @@ export default function App() {
         <div className="overlay">
           <div className="overlay-card history-card">
             <div className="overlay-title">{status || '게임 종료'}</div>
-            <div className="overlay-sub">정답: {decomposeToJamo(answer)}</div>
+            <div className="overlay-sub">정답: {decomposeToJamo(revealedAnswer || answer)}</div>
             <div className="overlay-actions" style={{ marginBottom: 12 }}>
               <button className="key action" onClick={nextGame}>Next Game</button>
             </div>
