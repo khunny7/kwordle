@@ -3,8 +3,11 @@ import Board from './components/Board';
 import Keyboard from './components/Keyboard';
 import HistoryModal from './components/HistoryModal';
 import HistoryView from './components/HistoryView';
+import AchievementsModal from './components/AchievementsModal';
+import AchievementToast from './components/AchievementToast';
 import { WORDS } from './wordlist';
-import { appendHistory } from './storage';
+import { appendHistory, updateGameStats, getGameStats, incrementSharedCount } from './storage';
+import { evaluateAndUnlockAchievements, migrateExistingUserAchievements } from './achievements/evaluator';
 
 function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -17,6 +20,7 @@ export default function App() {
   const [winRow, setWinRow] = useState(-1);
   const [gameOver, setGameOver] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
   const [allowed, setAllowed] = useState(null);
   const [wordLen, setWordLen] = useState(() => {
     const saved = Number(localStorage.getItem('kwordle.wordLen'));
@@ -24,9 +28,22 @@ export default function App() {
   });
   const [answer, setAnswer] = useState('');
   const [revealedAnswer, setRevealedAnswer] = useState(null);
+  const [newAchievement, setNewAchievement] = useState(null);
+  
+  // Game timing for achievements
+  const gameStartTime = useRef(null);
+  
   const confettiRef = useRef(null);
   const composing = useRef(false);
   // jamo-based input (no composition)
+
+  // Effect 0: Migrate existing users to achievements system
+  useEffect(() => {
+    const migratedAchievements = migrateExistingUserAchievements();
+    if (migratedAchievements.length > 0) {
+      console.log('Migrated achievements for existing user:', migratedAchievements.map(a => a.name));
+    }
+  }, []);
 
   // Effect 1: Load allowed list and pick answer ONLY when word length changes
   useEffect(() => {
@@ -98,35 +115,80 @@ export default function App() {
     const next = [...guesses, current];
     setGuesses(next);
     setCurrent('');
+    
+    // Calculate game duration
+    const gameDuration = gameStartTime.current ? 
+      Math.round((Date.now() - gameStartTime.current) / 1000) : null;
+    
   if (current === answer) {
       setStatus('정답!');
       setWinRow(next.length - 1);
       setGameOver(true);
       setRevealedAnswer(answer);
       triggerConfetti();
-      appendHistory({
+      
+      const gameResult = {
         ts: Date.now(),
-    answer,
+        answer,
         success: true,
         guesses: next.length,
-      });
+        durationSeconds: gameDuration
+      };
+      
+      appendHistory(gameResult);
+      
+      // Update stats and check for achievements
+      const updatedStats = updateGameStats(gameResult);
+      const newAchievements = evaluateAndUnlockAchievements(updatedStats, gameResult);
+      
+      // Show first achievement unlock toast if any
+      if (newAchievements.length > 0) {
+        setNewAchievement(newAchievements[0]);
+        if (newAchievements.length > 1) {
+          console.log('Multiple achievements unlocked:', newAchievements.map(a => a.name));
+        }
+      }
+      
   // History will be shown inside the game-over overlay
     } else if (next.length >= 6) {
       setStatus('실패!');
       setGameOver(true);
       setRevealedAnswer(answer);
-      appendHistory({
+      
+      const gameResult = {
         ts: Date.now(),
         answer,
         success: false,
         guesses: next.length,
-      });
+        durationSeconds: gameDuration
+      };
+      
+      appendHistory(gameResult);
+      
+      // Update stats and check for achievements
+      const updatedStats = updateGameStats(gameResult);
+      const newAchievements = evaluateAndUnlockAchievements(updatedStats, gameResult);
+      
+      // Show first achievement unlock toast if any
+      if (newAchievements.length > 0) {
+        setNewAchievement(newAchievements[0]);
+        if (newAchievements.length > 1) {
+          console.log('Multiple achievements unlocked:', newAchievements.map(a => a.name));
+        }
+      }
+      
   // History will be shown inside the game-over overlay
     }
   }
 
   function onKey(key) {
   if (gameOver) return;
+    
+    // Start game timer on first input
+    if (!gameStartTime.current && key !== 'ENTER' && key !== 'BACK') {
+      gameStartTime.current = Date.now();
+    }
+    
     if (key === 'ENTER') {
       submitGuess();
       return;
@@ -199,11 +261,44 @@ export default function App() {
     setWinRow(-1);
   setGameOver(false);
   setRevealedAnswer(null);
+  gameStartTime.current = null; // Reset game timer
   // Pick a new answer for the current mode
   const filtered = WORDS.filter(w => [...w].length === wordLen);
   const candidates = allowed && allowed.size ? Array.from(allowed) : filtered;
   const nextAnswer = candidates.length ? pickRandom(candidates) : 'ㅏ'.repeat(wordLen);
   setAnswer(nextAnswer);
+  }
+
+  function shareResults() {
+    try {
+      const stats = getGameStats();
+      const shareText = `K-Wordle - ${stats.wins}/${stats.gamesPlayed} wins (${Math.round((stats.wins / stats.gamesPlayed) * 100)}%)`;
+      
+      if (navigator.share) {
+        navigator.share({
+          title: 'K-Wordle Results',
+          text: shareText,
+          url: window.location.href
+        });
+      } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(`${shareText}\n${window.location.href}`);
+        setStatus('Results copied to clipboard!');
+        setTimeout(() => setStatus(''), 2000);
+      }
+      
+      // Update share count for social-butterfly achievement
+      const updatedStats = incrementSharedCount();
+      const newAchievements = evaluateAndUnlockAchievements(updatedStats);
+      
+      if (newAchievements.length > 0) {
+        setNewAchievement(newAchievements[0]);
+      }
+    } catch (error) {
+      console.warn('Share failed:', error);
+      setStatus('Share failed');
+      setTimeout(() => setStatus(''), 2000);
+    }
   }
 
   return (
@@ -218,12 +313,13 @@ export default function App() {
                 type="button"
                 className={`segmented-item ${wordLen===L ? 'active' : ''}`}
                 aria-pressed={wordLen===L}
-                onClick={() => { setGuesses([]); setCurrent(''); setStatus(''); setShakeRow(-1); setWinRow(-1); setGameOver(false); setWordLen(L); }}
+                onClick={() => { setGuesses([]); setCurrent(''); setStatus(''); setShakeRow(-1); setWinRow(-1); setGameOver(false); setWordLen(L); gameStartTime.current = null; }}
                 title={`${L}자`}
               >{L}</button>
             ))}
           </div>
           <a className="chip" href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
+          <button className="key" onClick={() => setShowAchievements(true)}>Achievements</button>
           <button className="key" onClick={() => setShowHistory(true)}>History</button>
         </div>
       </div>
@@ -239,12 +335,20 @@ export default function App() {
             <div className="overlay-sub">정답: {decomposeToJamo(revealedAnswer || answer)}</div>
             <div className="overlay-actions" style={{ marginBottom: 12 }}>
               <button className="key action" onClick={nextGame}>Next Game</button>
+              <button className="key" onClick={shareResults}>Share</button>
             </div>
             <HistoryView />
           </div>
         </div>
       )}
   {showHistory && <HistoryModal onClose={() => setShowHistory(false)} />}
+  {showAchievements && <AchievementsModal onClose={() => setShowAchievements(false)} />}
+  {newAchievement && (
+    <AchievementToast 
+      achievement={newAchievement} 
+      onDismiss={() => setNewAchievement(null)} 
+    />
+  )}
       <canvas ref={confettiRef} className="confetti" />
         {isDev && (
           <div className="debug">DEBUG ANSWER: {answer} — JAMO: {decomposeToJamo(answer)} (len {wordLen})</div>
