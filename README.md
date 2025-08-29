@@ -1,6 +1,26 @@
 # K-Wordle (React + Vite)
 
-This is a lightweight web app built with React and Vite.
+This is a lightweight Korean Wordle game built with React and Vite, featuring an achievements system to track player progress.
+
+## Features
+
+- **Korean Hangul Wordle** - Guess Korean words using Hangul characters
+- **Multiple Word Lengths** - Play with 6, 7, or 8 character words  
+- **Achievements System** - 15 unlockable achievements tracking various gameplay milestones
+- **Game Statistics** - Track wins, streaks, and performance metrics
+- **Share Results** - Share your game results with others
+- **Responsive Design** - Works on desktop and mobile devices
+- **Offline Support** - PWA with service worker caching
+
+## Achievements System
+
+The game includes 15 achievements across different categories:
+- **Play Count**: First game, 10 games, 100 games
+- **Victories**: First win, win streaks (3, 5, 10), comeback wins
+- **Skill**: Solve in 1-3 guesses, solve under 60 seconds
+- **Behavioral**: Early bird, night owl, sharing, perseverance
+
+See [docs/achievements.md](docs/achievements.md) for detailed documentation.
 
 ## Getting Started
 
@@ -11,7 +31,10 @@ This is a lightweight web app built with React and Vite.
 
 ## Structure
 - `src/` - React source code
+- `src/achievements/` - Achievement system logic
+- `src/components/` - React components  
 - `public/` - Static assets
+- `docs/` - Documentation
 
 ## Notes
 - No Electron dependencies are used. The app runs in the browser.
